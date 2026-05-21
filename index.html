@@ -126,6 +126,28 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 .session-chip.arms{border-color:rgba(232,255,71,.3);color:rgba(232,255,71,.9)}
 .vol-number{font-family:'Bebas Neue',sans-serif;font-size:21px;line-height:1}
 .vol-ok{color:var(--success)}.vol-warn{color:var(--accent)}.vol-low{color:var(--danger)}
+/* ── SKIP WEEK / LOGGER ─────────────────────── */
+.plan-ex-row-clickable{cursor:pointer;transition:background .15s;border-radius:6px;padding:6px 8px;margin:0 -8px}
+.plan-ex-row-clickable:hover{background:rgba(232,255,71,.06)}
+.set-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
+.set-row:last-child{border-bottom:none}
+.set-badge{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent);min-width:28px}
+.set-status{font-family:'DM Mono',monospace;font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);color:var(--dim)}
+.set-status.done{background:rgba(74,222,128,.1);border-color:rgba(74,222,128,.3);color:var(--success)}
+.set-status.active{background:rgba(232,255,71,.1);border-color:rgba(232,255,71,.3);color:var(--accent)}
+.timer-ring{display:flex;flex-direction:column;align-items:center;justify-content:center;margin:12px auto}
+.timer-display{font-family:'Bebas Neue',sans-serif;font-size:64px;line-height:1;letter-spacing:2px;color:var(--accent)}
+.timer-display.urgent{color:var(--danger);animation:blink .6s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.timer-label{font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);letter-spacing:2px;margin-top:4px}
+.timer-btns{display:flex;gap:8px;margin-top:12px;justify-content:center;flex-wrap:wrap}
+.rest-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:10px 0}
+.rest-fill{height:100%;border-radius:3px;transition:width .5s linear}
+.logger-input-row{display:flex;gap:8px;margin-bottom:12px}
+.logger-input-row input{flex:1}
+.skip-week-row{display:flex;align-items:center;gap:8px;margin-top:10px}
+.skip-week-row select{flex:1}
+
 </style>
 </head>
 <body>
@@ -212,7 +234,7 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
   <div class="page" id="page-plan">
     <div class="flex-between" style="margin-bottom:5px">
       <div><div class="section-title">WORKOUT PLAN</div><div class="section-sub">// 8-WEEK LOAD · 1-WEEK DELOAD · REPEAT</div></div>
-      <div class="flex-row"><button class="btn btn-ghost btn-sm" onclick="confirmRebuildPlan()">⟳ Rebuild</button><button class="btn btn-primary btn-sm" onclick="confirmNewPlan()">↺ New Plan</button></div>
+      <div class="flex-row"><button class="btn btn-ghost btn-sm" onclick="openSkipWeekModal()">⤭ Skip Week</button><button class="btn btn-ghost btn-sm" onclick="confirmRebuildPlan()">⟳ Rebuild</button><button class="btn btn-primary btn-sm" onclick="confirmNewPlan()">↺ New Plan</button></div>
     </div>
     <div class="card" id="plan-cycle-card">
       <div class="card-header"><span id="plan-cycle-label">CURRENT CYCLE</span><span id="plan-phase-badge" class="tag">LOADING</span></div>
@@ -751,9 +773,204 @@ function renderPlanPage(){
   for(let w=1;w<=total;w++){const p=document.createElement('div');const dl=w>plan.loadWeeks,cur=w===cw,past=w<cw;p.className=`week-pill ${dl?'deload':'load'} ${cur?'current':past?'done':''}`;if(!cur&&!past&&!dl)p.style.opacity='.4';p.textContent=dl?'D':w;strip.appendChild(p);}
   const all=getPlanSessions(plan.id),thisWk=all.filter(r=>r.week===cw),byDay={};
   thisWk.forEach(r=>{if(!byDay[r.day])byDay[r.day]={focus:r.focus,isDeload:r.isDeload,exercises:[]};if(r.exId)byDay[r.day].exercises.push(r);});
-  document.getElementById('plan-week-sessions').innerHTML=!Object.keys(byDay).length?'<div class="empty-state">No sessions planned.</div>':Object.entries(byDay).map(([day,s])=>{const vol=s.exercises.reduce((t,e)=>t+e.targetWeight*e.targetReps*e.targetSets,0);const vc=vol>=plan.volumeTarget?'vol-ok':vol>=plan.volumeTarget*.85?'vol-warn':'vol-low';const vp=Math.min(100,Math.round((vol/plan.volumeTarget)*100));const ck=DC[s.focus]||'arms';return`<div class="session-day-card ${s.isDeload?'deload-day':''}"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div><div class="day-focus"><span class="session-chip ${ck}" style="font-size:12px;padding:4px 10px">${s.focus.toUpperCase()}</span></div><div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);margin-top:3px">Day ${day}${s.isDeload?' · DELOAD':''}</div></div><div style="text-align:right"><div class="vol-number ${vc}">${vol>=1000?(vol/1000).toFixed(1)+'k':vol}</div><div class="helper-text">lbs volume</div></div></div>${s.exercises.map(ex=>`<div class="plan-exercise-row"><div><div class="plan-ex-name">${ex.exName}</div>${ex.primaryMuscles?`<div class="helper-text">${ex.primaryMuscles.split(',').slice(0,2).join(', ')}</div>`:''}</div><div class="plan-ex-prescription"><strong>${ex.targetWeight}</strong> lbs<br>${ex.targetSets}×${ex.targetReps} reps<br><span style="color:var(--dim)">${(ex.targetWeight*ex.targetReps*ex.targetSets).toLocaleString()} lbs</span></div></div>`).join('')}<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);margin-bottom:4px"><span>Volume: ${vol.toLocaleString()} lbs</span><span>Target: ${plan.volumeTarget.toLocaleString()} lbs</span></div><div class="progress-bar"><div class="progress-fill" style="width:${vp}%;background:${vol>=plan.volumeTarget?'var(--success)':vol>=plan.volumeTarget*.85?'var(--accent)':'var(--danger)'}"></div></div></div></div>`;}).join('');
+  document.getElementById('plan-week-sessions').innerHTML=!Object.keys(byDay).length?'<div class="empty-state">No sessions planned.</div>':Object.entries(byDay).map(([day,s])=>{const vol=s.exercises.reduce((t,e)=>t+e.targetWeight*e.targetReps*e.targetSets,0);const vc=vol>=plan.volumeTarget?'vol-ok':vol>=plan.volumeTarget*.85?'vol-warn':'vol-low';const vp=Math.min(100,Math.round((vol/plan.volumeTarget)*100));const ck=DC[s.focus]||'arms';return`<div class="session-day-card ${s.isDeload?'deload-day':''}"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div><div class="day-focus"><span class="session-chip ${ck}" style="font-size:12px;padding:4px 10px">${s.focus.toUpperCase()}</span></div><div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);margin-top:3px">Day ${day}${s.isDeload?' · DELOAD':''}</div></div><div style="text-align:right"><div class="vol-number ${vc}">${vol>=1000?(vol/1000).toFixed(1)+'k':vol}</div><div class="helper-text">lbs volume</div></div></div>${s.exercises.map(ex=>`<div class="plan-exercise-row plan-ex-row-clickable" onclick="openExerciseLogger(${ex.exId},'${(ex.exName||'').replace(/'/g,"\\'")}',${ex.targetWeight},${ex.targetReps},${ex.targetSets})"><div><div class="plan-ex-name">${ex.exName} <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--dim);margin-left:4px">TAP TO LOG</span></div>${ex.primaryMuscles?`<div class="helper-text">${ex.primaryMuscles.split(',').slice(0,2).join(', ')}</div>`:''}</div><div class="plan-ex-prescription"><strong>${ex.targetWeight}</strong> lbs<br>${ex.targetSets}×${ex.targetReps} reps<br><span style="color:var(--dim)">${(ex.targetWeight*ex.targetReps*ex.targetSets).toLocaleString()} lbs</span></div></div>`).join('')}<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);margin-bottom:4px"><span>Volume: ${vol.toLocaleString()} lbs</span><span>Target: ${plan.volumeTarget.toLocaleString()} lbs</span></div><div class="progress-bar"><div class="progress-fill" style="width:${vp}%;background:${vol>=plan.volumeTarget?'var(--success)':vol>=plan.volumeTarget*.85?'var(--accent)':'var(--danger)'}"></div></div></div></div>`;}).join('');
   const byWk={};all.forEach(r=>{if(!byWk[r.week])byWk[r.week]={};if(!byWk[r.week][r.day])byWk[r.week][r.day]={focus:r.focus,isDeload:r.isDeload,vol:0};if(r.exId)byWk[r.week][r.day].vol+=r.targetWeight*r.targetReps*r.targetSets;});
   document.getElementById('plan-full-grid').innerHTML=Object.entries(byWk).map(([wk,days])=>{const wn=parseInt(wk),dl=wn>plan.loadWeeks,cur=wn===cw,past=wn<cw,intensity=Math.round(PC.wi[wn-1]*100),tv=Object.values(days).reduce((s,d)=>s+d.vol,0);return`<div class="week-row"><div class="week-label ${dl?'dl':''} ${cur?'cur':''}">${dl?'DELOAD':`WK ${wn}`}${cur?'<div style="font-size:9px;font-family:\'DM Mono\',monospace;color:var(--accent)">← NOW</div>':''}${past?'<div style="font-size:9px;font-family:\'DM Mono\',monospace;color:var(--success)">✓</div>':''}</div><div><div class="session-chips">${Object.entries(days).map(([,d])=>`<div class="session-chip ${DC[d.focus]||'arms'}">${d.focus.replace(' & Shoulders','')}</div>`).join('')}<span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);align-self:center;margin-left:4px">${intensity}% · ${tv>=1000?(tv/1000).toFixed(0)+'k':tv} lbs</span></div><div class="helper-text" style="margin-top:4px">${getWkRange(plan.startDate,wn)} · ${PC.wr[wn-1]} reps · ${PC.ws[wn-1]} sets</div></div></div>`;}).join('');
+}
+
+
+// ── SKIP WEEK ────────────────────────────────
+function openSkipWeekModal(){
+  const plan=getActivePlan();
+  if(!plan){showToast('No active plan');return;}
+  const total=plan.loadWeeks+plan.deloadWeeks;
+  const cw=Math.min(getCurWeek(plan.startDate),total);
+  const sel=document.getElementById('skip-week-select');
+  sel.innerHTML='';
+  for(let w=1;w<=total;w++){
+    const dl=w>plan.loadWeeks;
+    const opt=document.createElement('option');
+    opt.value=w;
+    opt.textContent=dl?`Week ${w} — DELOAD`:`Week ${w} — Load (${Math.round(PC.wi[w-1]*100)}% intensity)`;
+    if(w===cw)opt.selected=true;
+    sel.appendChild(opt);
+  }
+  openModal('skip-week-modal');
+}
+function confirmSkipWeek(){
+  const plan=getActivePlan();
+  if(!plan)return;
+  const targetWeek=parseInt(document.getElementById('skip-week-select').value);
+  const total=plan.loadWeeks+plan.deloadWeeks;
+  const cw=Math.min(getCurWeek(plan.startDate),total);
+  if(targetWeek===cw){closeModal('skip-week-modal');showToast('Already on that week');return;}
+  if(!confirm(`Jump to Week ${targetWeek}? The plan start date will be adjusted so Week ${targetWeek} is current. Logged workouts are unaffected.`))return;
+  // Back-calculate a new startDate so that getCurWeek returns targetWeek
+  const newStart=new Date();
+  newStart.setDate(newStart.getDate()-((targetWeek-1)*7));
+  plan.startDate=newStart.toISOString().split('T')[0];
+  saveDS();
+  closeModal('skip-week-modal');
+  showToast(`Jumped to Week ${targetWeek}`,true);
+  renderPlanPage();
+}
+
+// ── EXERCISE LOGGER ───────────────────────────
+let loggerState={exId:null,exName:'',targetWeight:0,targetReps:0,targetSets:0,sets:[],setStartTime:null,setTimer:null,restTimer:null,restTotal:0,restRemaining:0};
+
+function openExerciseLogger(exId,exName,targetWeight,targetReps,targetSets){
+  // Preserve sets if same exercise, reset if different
+  if(loggerState.exId!==exId){
+    stopRestTimer();stopSetTimer();
+    loggerState={exId,exName,targetWeight,targetReps,targetSets,sets:[],setStartTime:null,setTimer:null,restTimer:null,restTotal:0,restRemaining:0};
+  } else {
+    loggerState.targetWeight=targetWeight;loggerState.targetReps=targetReps;loggerState.targetSets=targetSets;
+  }
+  document.getElementById('logger-ex-name').textContent=exName;
+  document.getElementById('logger-ex-meta').textContent=`Target: ${targetSets} sets × ${targetReps} reps @ ${targetWeight} lbs`;
+  document.getElementById('logger-weight').value=targetWeight;
+  document.getElementById('logger-reps').value=targetReps;
+  renderLoggerSets();
+  openModal('exercise-logger-modal');
+}
+
+function closeLoggerModal(){
+  stopRestTimer();stopSetTimer();
+  closeModal('exercise-logger-modal');
+}
+
+// Set timer (how long the set took)
+function startSetTimer(){
+  stopSetTimer();
+  loggerState.setStartTime=Date.now();
+  document.getElementById('logger-set-elapsed').textContent='Set time: 0s';
+  loggerState.setTimer=setInterval(()=>{
+    const elapsed=Math.round((Date.now()-loggerState.setStartTime)/1000);
+    document.getElementById('logger-set-elapsed').textContent=`Set time: ${elapsed}s`;
+  },500);
+  document.querySelector('#logger-input-section .btn-ghost').textContent='⏹ Stop Set';
+  document.querySelector('#logger-input-section .btn-ghost').onclick=stopSetTimer;
+}
+
+function stopSetTimer(){
+  if(loggerState.setTimer){clearInterval(loggerState.setTimer);loggerState.setTimer=null;}
+}
+
+function getSetElapsedSecs(){
+  if(!loggerState.setStartTime)return null;
+  return Math.round((Date.now()-loggerState.setStartTime)/1000);
+}
+
+// REST TIMER
+function setRestTimer(seconds){
+  stopRestTimer();
+  loggerState.restTotal=seconds;loggerState.restRemaining=seconds;
+  document.getElementById('logger-timer-section').style.display='block';
+  document.getElementById('logger-timer-sublabel').textContent=seconds>=180?'Heavy set timer · beeps at 0':'Easy set timer · beeps at 0';
+  updateRestDisplay();
+  loggerState.restTimer=setInterval(()=>{
+    loggerState.restRemaining--;
+    updateRestDisplay();
+    if(loggerState.restRemaining<=0){
+      stopRestTimer();
+      playBeep();
+      document.getElementById('logger-timer-display').textContent='GO!';
+      document.getElementById('logger-timer-display').classList.add('urgent');
+      setTimeout(()=>{document.getElementById('logger-timer-display').classList.remove('urgent');},3000);
+    }
+  },1000);
+}
+
+function updateRestDisplay(){
+  const r=loggerState.restRemaining;
+  const mins=Math.floor(r/60),secs=r%60;
+  const disp=`${mins}:${String(secs).padStart(2,'0')}`;
+  const el=document.getElementById('logger-timer-display');
+  const bar=document.getElementById('logger-rest-bar');
+  if(el)el.textContent=disp;
+  if(bar){
+    const pct=(loggerState.restRemaining/loggerState.restTotal)*100;
+    const color=pct>40?'var(--accent)':pct>15?'var(--accent2)':'var(--danger)';
+    bar.style.width=pct+'%';bar.style.background=color;
+  }
+  if(el)el.classList.toggle('urgent',r<=10&&r>0);
+}
+
+function stopRestTimer(){
+  if(loggerState.restTimer){clearInterval(loggerState.restTimer);loggerState.restTimer=null;}
+}
+
+// Audio beep using Web Audio API - no external deps
+function playBeep(){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    [0,0.3,0.6].forEach(offset=>{
+      const osc=ctx.createOscillator();const gain=ctx.createGain();
+      osc.connect(gain);gain.connect(ctx.destination);
+      osc.frequency.value=880;osc.type='sine';
+      gain.gain.setValueAtTime(0.6,ctx.currentTime+offset);
+      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+offset+0.25);
+      osc.start(ctx.currentTime+offset);osc.stop(ctx.currentTime+offset+0.3);
+    });
+    // extra long beep at end
+    const osc2=ctx.createOscillator();const g2=ctx.createGain();
+    osc2.connect(g2);g2.connect(ctx.destination);
+    osc2.frequency.value=1100;osc2.type='sine';
+    g2.gain.setValueAtTime(0.7,ctx.currentTime+0.9);
+    g2.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+1.8);
+    osc2.start(ctx.currentTime+0.9);osc2.stop(ctx.currentTime+1.9);
+  }catch(e){console.warn('Audio error:',e);}
+}
+
+function logThisSet(){
+  const weight=parseFloat(document.getElementById('logger-weight').value);
+  const reps=parseInt(document.getElementById('logger-reps').value);
+  if(!weight||!reps){showToast('Enter weight and reps');return;}
+  const elapsed=getSetElapsedSecs();
+  stopSetTimer();
+  loggerState.setStartTime=null;
+  document.getElementById('logger-set-elapsed').textContent='Set time: —';
+  document.querySelector('#logger-input-section .btn-ghost').textContent='▶ Start Set';
+  document.querySelector('#logger-input-section .btn-ghost').onclick=startSetTimer;
+
+  const setNum=loggerState.sets.length+1;
+  loggerState.sets.push({setNum,weight,reps,elapsedSecs:elapsed,loggedAt:new Date().toLocaleTimeString()});
+
+  // Also save to workout store
+  const exId=loggerState.exId;
+  const todayDate=todayStr();
+  let workout=DS.workouts.find(w=>w.date===todayDate&&w._planSession);
+  if(!workout){const wid=DS._woId++;workout={id:wid,date:todayDate,_planSession:true,sets:[]};DS.workouts.push(workout);}
+  workout.sets.push({exId,weight,reps,sets:1});
+  saveDS();
+
+  // Auto-start heavy rest timer after logging a set
+  const isHeavy=reps<=8;
+  setRestTimer(isHeavy?180:90);
+
+  renderLoggerSets();
+  document.getElementById('logger-set-num').textContent=setNum+1;
+}
+
+function renderLoggerSets(){
+  const el=document.getElementById('logger-sets-list');
+  const completed=loggerState.sets.length;
+  const target=loggerState.targetSets;
+  if(!completed){el.innerHTML='<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--dim)">No sets logged yet</div>';document.getElementById('logger-set-num').textContent=1;return;}
+  el.innerHTML=loggerState.sets.map(s=>`
+    <div class="set-row">
+      <div class="set-badge">${s.setNum}</div>
+      <div style="flex:1;margin:0 12px">
+        <div style="font-weight:600;font-size:14px">${s.weight} lbs × ${s.reps} reps</div>
+        <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--dim)">${s.elapsedSecs?`Set took ${s.elapsedSecs}s · `:''}${s.loggedAt}</div>
+      </div>
+      <span class="set-status done">✓ Done</span>
+    </div>`).join('');
+  // Show completion if all target sets done
+  if(completed>=target){
+    el.innerHTML+=`<div style="margin-top:10px;text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:var(--success)">✓ All ${target} sets complete! Volume: ${loggerState.sets.reduce((s,e)=>s+e.weight*e.reps,0).toLocaleString()} lbs</div>`;
+  }
+  document.getElementById('logger-set-num').textContent=Math.min(completed+1,target+1);
 }
 
 // ── LAUNCH ────────────────────────────────────
@@ -761,5 +978,63 @@ function launchApp(){document.getElementById('calibration-flow').classList.remov
 function init(){const cal=localStorage.getItem('tonal_calibrated');if(cal){launchApp();}else{document.getElementById('calibration-flow').classList.add('active');renderExercisePicker();}}
 init();
 </script>
+
+<!-- SKIP WEEK MODAL -->
+<div class="modal-overlay" id="skip-week-modal">
+  <div class="modal">
+    <div class="modal-title">SKIP TO WEEK</div>
+    <p style="font-size:13px;color:var(--mid);margin-bottom:16px">Jump to a specific week in the current cycle. Your start date will be adjusted so the selected week becomes the current week.</p>
+    <div class="form-group"><label>Select Week</label><select id="skip-week-select"></select></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('skip-week-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmSkipWeek()">Jump to Week</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXERCISE LOGGER MODAL -->
+<div class="modal-overlay" id="exercise-logger-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="flex-between" style="margin-bottom:4px">
+      <div class="modal-title" id="logger-ex-name" style="margin-bottom:0">Exercise</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeLoggerModal()">✕</button>
+    </div>
+    <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--dim);margin-bottom:16px" id="logger-ex-meta"></div>
+
+    <!-- REST TIMER -->
+    <div id="logger-timer-section" style="display:none">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px;text-align:center">
+        <div class="timer-label">REST TIMER</div>
+        <div class="timer-display" id="logger-timer-display">3:00</div>
+        <div class="rest-bar"><div class="rest-fill" id="logger-rest-bar" style="width:100%;background:var(--accent)"></div></div>
+        <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--dim)" id="logger-timer-sublabel">Heavy set timer · beeps at 0</div>
+        <div class="timer-btns">
+          <button class="btn btn-ghost btn-sm" onclick="setRestTimer(90)">1:30 Easy</button>
+          <button class="btn btn-ghost btn-sm" onclick="setRestTimer(180)">3:00 Heavy</button>
+          <button class="btn btn-ghost btn-sm" onclick="stopRestTimer()">Stop</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SET LOG INPUT -->
+    <div id="logger-input-section">
+      <div class="logger-input-row">
+        <div class="form-group" style="flex:1"><label>Weight (lbs)</label><input type="number" id="logger-weight" min="0" step="2.5"></div>
+        <div class="form-group" style="flex:1"><label>Reps</label><input type="number" id="logger-reps" min="1" max="30"></div>
+      </div>
+      <div class="flex-row" style="margin-bottom:14px">
+        <button class="btn btn-ghost btn-sm" onclick="startSetTimer()">▶ Start Set</button>
+        <span id="logger-set-elapsed" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--dim)">Set time: —</span>
+      </div>
+      <button class="btn btn-primary" onclick="logThisSet()" style="width:100%">LOG SET <span id="logger-set-num">1</span></button>
+    </div>
+
+    <!-- SETS HISTORY -->
+    <div style="margin-top:16px">
+      <div class="card-header" style="margin-bottom:8px">SETS LOGGED THIS SESSION</div>
+      <div id="logger-sets-list"><div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--dim)">No sets logged yet</div></div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
