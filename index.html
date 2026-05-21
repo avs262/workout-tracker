@@ -956,7 +956,7 @@ function renderLoggerSets(){
   const el=document.getElementById('logger-sets-list');
   const completed=loggerState.sets.length;
   const target=loggerState.targetSets;
-  if(!completed){el.innerHTML='<div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--dim)">No sets logged yet</div>';document.getElementById('logger-set-num').textContent=1;return;}
+  if(!completed){el.innerHTML='<div style="font-family:DM Mono,monospace;font-size:11px;color:var(--dim)">No sets logged yet</div>';document.getElementById('logger-set-num').textContent=1;return;}
   el.innerHTML=loggerState.sets.map(s=>`
     <div class="set-row">
       <div class="set-badge">${s.setNum}</div>
