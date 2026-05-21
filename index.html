@@ -212,7 +212,7 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
   <div class="page" id="page-plan">
     <div class="flex-between" style="margin-bottom:5px">
       <div><div class="section-title">WORKOUT PLAN</div><div class="section-sub">// 8-WEEK LOAD · 1-WEEK DELOAD · REPEAT</div></div>
-      <button class="btn btn-primary btn-sm" onclick="confirmNewPlan()">↺ New Plan</button>
+      <div class="flex-row"><button class="btn btn-ghost btn-sm" onclick="confirmRebuildPlan()">⟳ Rebuild</button><button class="btn btn-primary btn-sm" onclick="confirmNewPlan()">↺ New Plan</button></div>
     </div>
     <div class="card" id="plan-cycle-card">
       <div class="card-header"><span id="plan-cycle-label">CURRENT CYCLE</span><span id="plan-phase-badge" class="tag">LOADING</span></div>
@@ -712,6 +712,25 @@ function generateNewPlan(){
   for(let w=1;w<=total;w++){const dl=w>PC.loadWeeks;for(const d of PC.days){const ex=buildSession(getExForFocus(d.group),w-1,PC.volumeTarget,dl);sessions.push({id:sid++,week:w,day:d.day,focus:d.focus,isDeload:dl,exercises:ex.map(e=>({exId:e.id,weight:e.targetWeight,reps:e.reps,sets:e.sets}))});}}
   if(!DS.plans)DS.plans=[];DS.plans.push({id:planId,cycle:cycleNum,startDate:todayStr(),loadWeeks:PC.loadWeeks,deloadWeeks:PC.deloadWeeks,volumeTarget:PC.volumeTarget,sessions});
   saveDS();showToast(`Cycle ${cycleNum} plan generated!`,true);renderPlanPage();
+}
+function confirmRebuildPlan(){
+  const plan=getActivePlan();
+  if(!plan){showToast('No active plan to rebuild');return;}
+  const cw=Math.min(getCurWeek(plan.startDate),plan.loadWeeks+plan.deloadWeeks);
+  if(!confirm(`Rebuild Cycle ${plan.cycle} keeping Week ${cw} as the current week? Exercises will be recalculated from your latest logged weights. Your logged workouts won't be lost.`))return;
+  rebuildPlan();
+}
+function rebuildPlan(){
+  const plan=getActivePlan();
+  if(!plan)return;
+  // Preserve start date and cycle number — only regenerate sessions
+  const cw=Math.min(getCurWeek(plan.startDate),plan.loadWeeks+plan.deloadWeeks);
+  const total=plan.loadWeeks+plan.deloadWeeks;
+  let sid=1;const sessions=[];
+  for(let w=1;w<=total;w++){const dl=w>plan.loadWeeks;for(const d of PC.days){const ex=buildSession(getExForFocus(d.group),w-1,plan.volumeTarget,dl);sessions.push({id:sid++,week:w,day:d.day,focus:d.focus,isDeload:dl,exercises:ex.map(e=>({exId:e.id,weight:e.targetWeight,reps:e.reps,sets:e.sets}))});}}
+  // Replace sessions in-place, keep everything else (id, cycle, startDate) intact
+  plan.sessions=sessions;
+  saveDS();showToast(`Cycle ${plan.cycle} rebuilt from current weights`,true);renderPlanPage();
 }
 function getCurWeek(start){const diff=Math.floor((new Date()-new Date(start+'T00:00:00'))/86400000);return Math.max(1,Math.floor(diff/7)+1);}
 function getWkRange(start,wk){const s=new Date(start+'T00:00:00');s.setDate(s.getDate()+(wk-1)*7);const e=new Date(s);e.setDate(e.getDate()+6);const f=d=>d.toLocaleDateString('en-US',{month:'short',day:'numeric'});return`${f(s)} – ${f(e)}`;}
