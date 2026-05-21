@@ -683,26 +683,45 @@ function getActivePlan(){return DS.plans&&DS.plans.length?DS.plans[DS.plans.leng
 function getPlanSessions(planId){const plan=DS.plans.find(p=>p.id===planId);if(!plan||!plan.sessions)return[];const rows=[];plan.sessions.forEach(s=>{if(!s.exercises||!s.exercises.length){rows.push({sessionId:s.id,week:s.week,day:s.day,focus:s.focus,isDeload:s.isDeload,exId:null,targetWeight:null,targetReps:null,targetSets:null,exName:null,primaryMuscles:null});}else{s.exercises.forEach(ex=>{const e=DS.exercises.find(x=>x.id===ex.exId);rows.push({sessionId:s.id,week:s.week,day:s.day,focus:s.focus,isDeload:s.isDeload,exId:ex.exId,targetWeight:ex.weight,targetReps:ex.reps,targetSets:ex.sets,exName:e?e.name:'?',primaryMuscles:e?e.pm:''});});}});return rows;}
 // Similarity groups — exercises sharing a key movement pattern won't both appear in the same session
 const SIMILAR_GROUPS=[
+  // BACK — pulling patterns
   ['Lat Pulldown','Wide Grip Lat Pulldown','Single Arm Lat Pulldown','Close Grip Lat Pulldown'],
   ['Seated Row','Wide Grip Seated Row','Single Arm Seated Row','Chest Supported Row','Low Row'],
   ['Bent-Over Row','Single Arm Row','Underhand Row','T-Bar Row','Meadows Row'],
+  // SHOULDERS
   ['Shoulder Press','Overhead Press','Arnold Press','Single Arm Shoulder Press'],
+  ['Lateral Raise','Cable Lateral Raise','Single Arm Lateral Raise'],
+  ['Rear Delt Fly','Reverse Fly','Face Pull'],
+  // ARMS — curls
   ['Bicep Curl','Cable Curl','Incline Curl','Concentration Curl','21s Curl'],
   ['Hammer Curl','Zottman Curl','Reverse Curl'],
+  // ARMS — triceps
   ['Tricep Pushdown','Rope Pushdown','Single Arm Tricep Pushdown'],
-  ['Chest Press','Bench Press','Single Arm Chest Press','Alternating Chest Press'],
-  ['Incline Chest Press','Incline Bench Press'],
-  ['Chest Fly','Cable Crossover','Incline Chest Fly'],
-  ['Hip Thrust','Single Leg Hip Thrust','Kneeling Hip Thrust','Banded Glute Bridge','Glute Bridge'],
-  ['Romanian Deadlift','Single Leg RDL','Single Leg Romanian Deadlift','Good Morning'],
-  ['Squat','Front Squat','Goblet Squat'],
-  ['Lunge','Reverse Lunge','Forward Lunge','Lateral Lunge','Bulgarian Split Squat','Split Squat'],
-  ['Lateral Raise','Cable Lateral Raise','Single Arm Lateral Raise'],
   ['Overhead Tricep Extension','Skull Crusher'],
+  // CHEST — each angle is its own group so bench+incline+decline CAN coexist
+  ['Chest Press','Bench Press','Single Arm Chest Press','Alternating Chest Press','Close Grip Chest Press','Svend Press'],
+  ['Incline Chest Press','Incline Bench Press'],
+  ['Decline Chest Press'],
+  ['Chest Fly','Cable Crossover'],
+  ['Incline Chest Fly'],
+  ['Low Chest Fly'],
+  // LEGS — knee dominant
+  ['Squat','Front Squat','Goblet Squat'],
+  ['Reverse Lunge','Forward Lunge','Lateral Lunge','Bulgarian Split Squat','Split Squat','Curtsy Lunge'],
+  ['Leg Press'],
+  ['Leg Extension'],
+  // LEGS — hip dominant / posterior chain
+  ['Romanian Deadlift','Single Leg RDL','Single Leg Romanian Deadlift'],
+  ['Good Morning'],
   ['Leg Curl','Nordic Curl'],
+  // LEGS — glutes
+  ['Hip Thrust','Single Leg Hip Thrust','Kneeling Hip Thrust','Banded Glute Bridge','Glute Bridge','Frog Pump'],
+  ['Cable Kickback','Donkey Kick'],
+  ['Hip Abduction','Fire Hydrant'],
+  // LEGS — calves
   ['Calf Raise','Single Leg Calf Raise','Seated Calf Raise'],
+  // FULL BODY — deadlift patterns
   ['Deadlift','Sumo Deadlift','Trap Bar Deadlift'],
-  ['Rear Delt Fly','Reverse Fly','Face Pull'],
+  // CORE
   ['Plank','Side Plank'],
   ['Ab Crunch','Cable Crunch','Reverse Crunch','Toe Touch'],
   ['Bicycle Crunch','Russian Twist','Oblique Crunch'],
