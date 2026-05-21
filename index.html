@@ -687,6 +687,19 @@ const MAX_EX_PER_SESSION = 6;   // max distinct exercises per session
 const MIN_SETS = 3; const MAX_SETS = 5;
 const MIN_REPS = 6; const MAX_REPS = 18;
 
+// Sensible per-group weight fallbacks when no history exists
+const GROUP_DEFAULTS={'Chest':70,'Back':60,'Shoulders':40,'Arms':30,'Legs':100,'Glutes':80,'Core':25,'Full Body':80};
+
+function getBaseWeight(ex){
+  // 1. Use last logged set weight
+  const last=getLastSet(ex.id);
+  if(last)return last.weight;
+  // 2. Check calibration seed workouts (workouts marked as initial calibration have only 1 set entry)
+  // They are stored as normal workouts — getLastSet already handles this, so fall through to default
+  // 3. Use muscle-group default
+  return GROUP_DEFAULTS[ex.muscle_group]||50;
+}
+
 function buildSession(exercises,wkIdx,target,isDeload){
   if(!exercises.length)return[];
   const intensity=PC.wi[wkIdx];
@@ -695,26 +708,42 @@ function buildSession(exercises,wkIdx,target,isDeload){
   // Clamp sets within 3–5
   const sets=Math.min(MAX_SETS,Math.max(MIN_SETS,PC.ws[wkIdx]));
 
-  // Cap number of exercises per session — pick top exercises by last logged weight (most data = most relevant)
+  // Cap number of exercises per session
   const capped=exercises.slice(0,MAX_EX_PER_SESSION);
 
   let res=capped.map(ex=>{
-    const last=getLastSet(ex.id);const base=last?last.weight:20;
+    const base=getBaseWeight(ex);
     const tw=Math.round((base*intensity)/2.5)*2.5;
     return{...ex,targetWeight:tw,reps,sets};
   });
 
-  // Try to hit volume target by adding sets (capped at MAX_SETS) before anything else
   if(!isDeload){
-    let vol=res.reduce((s,e)=>s+e.targetWeight*e.reps*e.sets,0);
+    let vol=()=>res.reduce((s,e)=>s+e.targetWeight*e.reps*e.sets,0);
+
+    // Stage 1: add sets up to MAX_SETS on heaviest exercises
     let att=0;
-    while(vol<target&&att<50){
-      // Find exercise that can still accept more sets
+    while(vol()<target&&att<50){
       res.sort((a,b)=>b.targetWeight-a.targetWeight);
       const eligible=res.find(e=>e.sets<MAX_SETS);
-      if(eligible){eligible.sets++;} 
-      else{break;} // all exercises already at MAX_SETS
-      vol=res.reduce((s,e)=>s+e.targetWeight*e.reps*e.sets,0);
+      if(!eligible)break;
+      eligible.sets++;att++;
+    }
+
+    // Stage 2: add reps up to MAX_REPS on all exercises
+    att=0;
+    while(vol()<target&&att<50){
+      res.sort((a,b)=>b.targetWeight-a.targetWeight);
+      const eligible=res.find(e=>e.reps<MAX_REPS);
+      if(!eligible)break;
+      eligible.reps++;att++;
+    }
+
+    // Stage 3: scale up weight in 2.5 lb increments on heaviest exercise
+    // This handles the case where base weights are very low (no history yet)
+    att=0;
+    while(vol()<target&&att<200){
+      res.sort((a,b)=>b.targetWeight-a.targetWeight);
+      res[0].targetWeight=Math.round((res[0].targetWeight+2.5)*10)/10;
       att++;
     }
   }
