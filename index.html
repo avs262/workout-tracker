@@ -728,8 +728,9 @@ const SIMILAR_GROUPS=[
 ];
 
 function getSimilarityKey(name){
+  const lower=name.toLowerCase().trim();
   for(let i=0;i<SIMILAR_GROUPS.length;i++){
-    if(SIMILAR_GROUPS[i].some(n=>name.toLowerCase().includes(n.toLowerCase())||n.toLowerCase().includes(name.toLowerCase())))return i;
+    if(SIMILAR_GROUPS[i].some(n=>n.toLowerCase().trim()===lower))return i;
   }
   return null;
 }
