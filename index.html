@@ -212,7 +212,7 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
   <div class="page" id="page-plan">
     <div class="flex-between" style="margin-bottom:5px">
       <div><div class="section-title">WORKOUT PLAN</div><div class="section-sub">// 8-WEEK LOAD · 1-WEEK DELOAD · REPEAT</div></div>
-      <button class="btn btn-primary btn-sm" onclick="generateNewPlan()">↺ New Plan</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmNewPlan()">↺ New Plan</button>
     </div>
     <div class="card" id="plan-cycle-card">
       <div class="card-header"><span id="plan-cycle-label">CURRENT CYCLE</span><span id="plan-phase-badge" class="tag">LOADING</span></div>
@@ -660,12 +660,51 @@ const DC={'Chest':'chest','Legs':'legs','Back':'back','Arms & Shoulders':'arms'}
 function getActivePlan(){return DS.plans&&DS.plans.length?DS.plans[DS.plans.length-1]:null;}
 function getPlanSessions(planId){const plan=DS.plans.find(p=>p.id===planId);if(!plan||!plan.sessions)return[];const rows=[];plan.sessions.forEach(s=>{if(!s.exercises||!s.exercises.length){rows.push({sessionId:s.id,week:s.week,day:s.day,focus:s.focus,isDeload:s.isDeload,exId:null,targetWeight:null,targetReps:null,targetSets:null,exName:null,primaryMuscles:null});}else{s.exercises.forEach(ex=>{const e=DS.exercises.find(x=>x.id===ex.exId);rows.push({sessionId:s.id,week:s.week,day:s.day,focus:s.focus,isDeload:s.isDeload,exId:ex.exId,targetWeight:ex.weight,targetReps:ex.reps,targetSets:ex.sets,exName:e?e.name:'?',primaryMuscles:e?e.pm:''});});}});return rows;}
 function getExForFocus(group){const exs=getAllExercises();return group==='Arms'?exs.filter(e=>e.muscle_group==='Arms'||e.muscle_group==='Shoulders'):exs.filter(e=>e.muscle_group===group||(e.muscle_group==='Glutes'&&group==='Legs'));}
+// Per-session constraints
+const MAX_EX_PER_SESSION = 6;   // max distinct exercises per session
+const MIN_SETS = 3; const MAX_SETS = 5;
+const MIN_REPS = 6; const MAX_REPS = 18;
+
 function buildSession(exercises,wkIdx,target,isDeload){
   if(!exercises.length)return[];
-  const intensity=PC.wi[wkIdx],reps=PC.wr[wkIdx],sets=PC.ws[wkIdx];
-  let res=exercises.map(ex=>{const last=getLastSet(ex.id);const base=last?last.weight:20;const tw=Math.round((base*intensity)/2.5)*2.5;return{...ex,targetWeight:tw,reps,sets};});
-  if(!isDeload){let vol=res.reduce((s,e)=>s+e.targetWeight*e.reps*e.sets,0),att=0;while(vol<target&&att<20){res.sort((a,b)=>b.targetWeight-a.targetWeight);res[0]={...res[0],sets:res[0].sets+1};vol=res.reduce((s,e)=>s+e.targetWeight*e.reps*e.sets,0);att++;}}
+  const intensity=PC.wi[wkIdx];
+  // Clamp reps within 6–18
+  const reps=Math.min(MAX_REPS,Math.max(MIN_REPS,PC.wr[wkIdx]));
+  // Clamp sets within 3–5
+  const sets=Math.min(MAX_SETS,Math.max(MIN_SETS,PC.ws[wkIdx]));
+
+  // Cap number of exercises per session — pick top exercises by last logged weight (most data = most relevant)
+  const capped=exercises.slice(0,MAX_EX_PER_SESSION);
+
+  let res=capped.map(ex=>{
+    const last=getLastSet(ex.id);const base=last?last.weight:20;
+    const tw=Math.round((base*intensity)/2.5)*2.5;
+    return{...ex,targetWeight:tw,reps,sets};
+  });
+
+  // Try to hit volume target by adding sets (capped at MAX_SETS) before anything else
+  if(!isDeload){
+    let vol=res.reduce((s,e)=>s+e.targetWeight*e.reps*e.sets,0);
+    let att=0;
+    while(vol<target&&att<50){
+      // Find exercise that can still accept more sets
+      res.sort((a,b)=>b.targetWeight-a.targetWeight);
+      const eligible=res.find(e=>e.sets<MAX_SETS);
+      if(eligible){eligible.sets++;} 
+      else{break;} // all exercises already at MAX_SETS
+      vol=res.reduce((s,e)=>s+e.targetWeight*e.reps*e.sets,0);
+      att++;
+    }
+  }
   return res;
+}
+function confirmNewPlan(){
+  const plan=getActivePlan();
+  if(plan){
+    const cw=Math.min(getCurWeek(plan.startDate),plan.loadWeeks+plan.deloadWeeks);
+    if(!confirm(`Start a new plan? This will end Cycle ${plan.cycle} (currently Week ${cw}). Your logged workouts won't be lost.`))return;
+  }
+  generateNewPlan();
 }
 function generateNewPlan(){
   const existing=getActivePlan();const cycleNum=existing?existing.cycle+1:1;
